@@ -3,6 +3,7 @@ import sys
 
 from toolkit import calculator, converter, errors
 
+
 # создаем парсер для команды
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="toolkit")
