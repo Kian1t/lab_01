@@ -15,10 +15,12 @@ def match_simbol(char: str) -> str:
     :return: Значение type (str) для этого символа
     """
 
-    types = {"+": "PLUS",
+    types: dict = {"+": "PLUS",
              "-": "MINUS",
              "*": "STAR",
-             "/": "SLASH"}
+             "/": "SLASH",
+             "//": "DUAL_SLASH",
+             "%": "PERCENT"}
     return types[char]
 
 def tokenize(expression: str) -> list[Token]:
@@ -30,17 +32,17 @@ def tokenize(expression: str) -> list[Token]:
     """
 
     tokens: list[Token] = []
-    i = 0
-    n = len(expression)
+    i: int = 0
+    n: int = len(expression)
     while i < n:
-        char = expression[i]
+        char: str = expression[i]
 
         if char.isspace():
             i += 1
 
         elif char.isdigit():
-            number = ""
-            dot_count = 0
+            number: str = ""
+            dot_count: int = 0
             while char.isdigit() or char == "." and dot_count <= 1:
                 number+=char
                 i += 1
@@ -49,10 +51,10 @@ def tokenize(expression: str) -> list[Token]:
                 char = expression[i]
                 if char == ".": dot_count+=1
 
-            new_token = Token(type="NUMBER", value=float(number))
+            new_token: Token = Token(type="NUMBER", value=float(number))
             tokens.append(new_token)
 
-        elif char in "+-*/":
+        elif char in "+-*/%":
             if len(tokens) == 0:
                 if char in "+-":
                     if char == "+":
@@ -62,7 +64,11 @@ def tokenize(expression: str) -> list[Token]:
                         tokens.append(Token(type="UNARY_MINUS"))
                 else:
                     i += 1
-                    tokens.append(Token(type=match_simbol(char)))
+                    if char == "/" and expression[i] == "/":
+                        i += 1
+                        tokens.append(Token(type="DUAL_SLASH"))
+                    else:
+                        tokens.append(Token(type=match_simbol(char)))
 
 
             elif char in "+-" and tokens[-1].type != "NUMBER":
@@ -72,8 +78,12 @@ def tokenize(expression: str) -> list[Token]:
                     i+=1
                     tokens.append(Token(type="UNARY_MINUS"))
             else:
-                tokens.append(Token(type=match_simbol(char)))
                 i += 1
+                if char == "/" and expression[i] == "/":
+                    i += 1
+                    tokens.append(Token(type="DUAL_SLASH"))
+                else:
+                    tokens.append(Token(type=match_simbol(char)))
 
         else:
             raise errors.InvalidCharacterError(f"Ошибка! Недопустимый символ: {char}!")
@@ -90,7 +100,7 @@ def validate(tokens: list[Token]) -> None:
     if not tokens:
         raise errors.EmptyExpressionError("Ошибка! Пустое выражение")
 
-    state = True
+    state: bool = True
 
     for token in tokens:
         if state:
@@ -119,11 +129,11 @@ def calculation(tokens: list[Token]) -> float:
     # Проверяем выражение на верность
     validate(tokens)
 
-    values = []
-    operators = []
+    values: list = []
+    operators: list = []
 
     # Рассчитываем унарные минусы для чисел и разделяем операторы и числа (лишние унарные минусы не записываем, просто домножаем число на ьultiplier)
-    multiplier = 1
+    multiplier: int = 1
     for token in tokens:
         if token.type == "UNARY_MINUS":
             multiplier *= -1
@@ -134,13 +144,13 @@ def calculation(tokens: list[Token]) -> float:
             operators.append(token.type)
 
     # составляем итоговый массив чисел (для sum())
-    nums = []
-    num = values[0]
+    nums: list = []
+    num: int = values[0]
     for i in range(len(operators)):
-        operator = operators[i]
+        operator: str = operators[i]
 
         # если между текущим числом a и следующим числом b стоит + или -, то просто добавляем в массив a, и принимаем за текущее число b
-        if operator != "SLASH" and operator != "STAR":
+        if operator != "SLASH" and operator != "STAR" and operator != "PERCENT" and operator != "DUAL_SLASH":
             nums.append(num)
             num = values[i + 1] * ((-1) if operator == "MINUS" else 1)
 
@@ -150,6 +160,13 @@ def calculation(tokens: list[Token]) -> float:
                 if values[i + 1] == 0:
                     raise errors.DivisionByZeroError("Ошибка! Деление на ноль")
                 num /= values[i + 1]
+            if operator == "DUAL_SLASH":
+                if values[i + 1] == 0:
+                    raise errors.DivisionByZeroError("Ошибка! Деление на ноль")
+                num //= values[i + 1]
+            if operator == "PERCENT":
+                next_num_temp: int = values[i + 1]
+                num = abs(num) % abs(values[i + 1]) * (abs(num) // num) * (abs(next_num_temp) // next_num_temp)
             if operator == "STAR":
                 num *= values[i + 1]
     nums.append(num)
